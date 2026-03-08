@@ -9,8 +9,6 @@ local history = require 'aux.core.history'
 local gui = require 'aux.gui'
 local tooltip = require 'aux.core.tooltip'
 
-local price_per_unit = false
-
 local HEAD_HEIGHT = 32
 local HEAD_SPACE = -2
 
@@ -66,23 +64,23 @@ end
 M.search_columns = {
     {
         title = 'Item:',
-        width = .35,
+        width = .29,
         init = item_column_init,
         fill = item_column_fill,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.compare(record_a.name, record_b.name, desc)
         end,
     },
     {
         title = 'Lvl:',
-        width = .035,
+        width = .04,
         align = 'CENTER',
         fill = function(cell, record)
             local display_level = max(record.level, 1)
             display_level = UnitLevel'player' < record.level and aux.color.red(display_level) or display_level
             cell.text:SetText(display_level)
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.compare(record_a.level, record_b.level, desc)
         end,
     },
@@ -97,7 +95,7 @@ M.search_columns = {
             end
             cell.text:SetText(numAuctionsText)
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.EQ
 --            if sortKey == 'numAuctions' then
 --                if a.children then
@@ -112,12 +110,12 @@ M.search_columns = {
     },
     {
         title = 'Stack\nSize:',
-        width = .055,
+        width = .06,
         align = 'CENTER',
         fill = function(cell, record)
             cell.text:SetText(record.aux_quantity)
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.compare(record_a.aux_quantity, record_b.aux_quantity, desc)
         end,
     },
@@ -128,18 +126,18 @@ M.search_columns = {
         fill = function(cell, record)
             cell.text:SetText(TIME_LEFT_STRINGS[record.duration or 0] or '?')
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.compare(record_a.duration, record_b.duration, desc)
         end,
     },
     {
         title = 'Seller:',
-        width = .13,
+        width = .11,
         align = 'CENTER',
         fill = function(cell, record)
             cell.text:SetText(info.is_player(record.owner) and (aux.color.yellow(record.owner)) or (record.owner or '?'))
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             if not record_a.owner and not record_b.owner then
                 return sort_util.EQ
             elseif not record_a.owner then
@@ -165,24 +163,24 @@ M.search_columns = {
             end
             local price
             if record.high_bidder then
-                price = price_per_unit and ceil(record.high_bid / record.aux_quantity) or record.high_bid
+                price = cell.rt.price_per_unit and ceil(record.high_bid / record.aux_quantity) or record.high_bid
             else
-                price = price_per_unit and ceil(record.unit_bid_price) or record.bid_price
+                price = cell.rt.price_per_unit and ceil(record.unit_bid_price) or record.bid_price
             end
             cell.text:SetText(money.to_string(price, true, false, price_color))
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             local price_a
             if record_a.high_bidder then
-                price_a = price_per_unit and record_a.high_bid / record_a.aux_quantity or record_a.high_bid
+                price_a = rt.price_per_unit and record_a.high_bid / record_a.aux_quantity or record_a.high_bid
             else
-                price_a = price_per_unit and record_a.unit_bid_price or record_a.bid_price
+                price_a = rt.price_per_unit and record_a.unit_bid_price or record_a.bid_price
             end
             local price_b
             if record_b.high_bidder then
-                price_b = price_per_unit and record_b.high_bid / record_b.aux_quantity or record_b.high_bid
+                price_b = rt.price_per_unit and record_b.high_bid / record_b.aux_quantity or record_b.high_bid
             else
-                price_b = price_per_unit and record_b.unit_bid_price or record_b.bid_price
+                price_b = rt.price_per_unit and record_b.unit_bid_price or record_b.bid_price
             end
             if record_a.high_bidder and not record_b.high_bidder then
 	            return sort_util.GT
@@ -205,12 +203,12 @@ M.search_columns = {
         align = 'RIGHT',
         isPrice = true,
         fill = function(cell, record)
-            local price = price_per_unit and ceil(record.unit_buyout_price) or record.buyout_price
+            local price = cell.rt.price_per_unit and ceil(record.unit_buyout_price) or record.buyout_price
             cell.text:SetText(price > 0 and money.to_string(price, true) or '---')
         end,
-        cmp = function(record_a, record_b, desc)
-            local price_a = price_per_unit and record_a.unit_buyout_price or record_a.buyout_price
-            local price_b = price_per_unit and record_b.unit_buyout_price or record_b.buyout_price
+        cmp = function(rt, record_a, record_b, desc)
+            local price_a = rt.price_per_unit and record_a.unit_buyout_price or record_a.buyout_price
+            local price_b = rt.price_per_unit and record_b.unit_buyout_price or record_b.buyout_price
             price_a = price_a > 0 and price_a or (desc and -aux.huge or aux.huge)
             price_b = price_b > 0 and price_b or (desc and -aux.huge or aux.huge)
 
@@ -218,14 +216,39 @@ M.search_columns = {
         end,
     },
     {
+        title = 'Vendor/\nProfit:',
+        width = .09,
+        align = 'RIGHT',
+        fill = function(cell, record)
+            local vendor_price = info.vendor_sell_price(record.item_id)
+            local profit = (vendor_price and record.unit_buyout_price > 0) and (vendor_price - record.unit_buyout_price) or nil
+            if profit and profit > 0 then
+                cell.text:SetText(aux.color.green('+' .. money.to_string(profit, true)))
+            else
+                cell.text:SetText(vendor_price and money.to_string(vendor_price, true) or '?')
+            end
+        end,
+        cmp = function(rt, record_a, record_b, desc)
+            local vendor_price_a = info.vendor_sell_price(record_a.item_id)
+            local profit_a = (vendor_price_a and record_a.unit_buyout_price > 0) and (vendor_price_a - record_a.unit_buyout_price) or nil
+            local vendor_price_b = info.vendor_sell_price(record_b.item_id)
+            local profit_b = (vendor_price_b and record_b.unit_buyout_price > 0) and (vendor_price_b - record_b.unit_buyout_price) or nil
+
+            local val_a = (profit_a and profit_a > 0) and (1e12 + profit_a) or (vendor_price_a or -1)
+            local val_b = (profit_b and profit_b > 0) and (1e12 + profit_b) or (vendor_price_b or -1)
+
+            return sort_util.compare(val_a, val_b, desc)
+        end,
+    },
+    {
         title = 'Historical\nValue (%):',
-        width = .08,
+        width = .06,
         align = 'CENTER',
         fill = function(cell, record)
             local pct, bidPct = record_percentage(record)
             cell.text:SetText((pct or bidPct) and gui.percentage_historical(pct or bidPct, not pct) or '?')
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             local pct_a = record_percentage(record_a) or (desc and -aux.huge or aux.huge)
             local pct_b = record_percentage(record_b) or (desc and -aux.huge or aux.huge)
             return sort_util.compare(pct_a, pct_b, desc)
@@ -239,7 +262,7 @@ M.auctions_columns = {
         width = .35,
         init = item_column_init,
         fill = item_column_fill,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.compare(record_a.name, record_b.name, desc)
         end,
     },
@@ -252,7 +275,7 @@ M.auctions_columns = {
             display_level = UnitLevel('player') < record.level and aux.color.red(display_level) or display_level
             cell.text:SetText(display_level)
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.compare(record_a.level, record_b.level, desc)
         end,
     },
@@ -264,7 +287,7 @@ M.auctions_columns = {
             local numAuctionsText = expandable and aux.color.link(count) or count
             cell.text:SetText(numAuctionsText)
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.EQ
             --            if sortKey == 'numAuctions' then
             --                if a.children then
@@ -284,7 +307,7 @@ M.auctions_columns = {
         fill = function(cell, record)
             cell.text:SetText(record.aux_quantity)
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.compare(record_a.aux_quantity, record_b.aux_quantity, desc)
         end,
     },
@@ -295,7 +318,7 @@ M.auctions_columns = {
         fill = function(cell, record)
             cell.text:SetText(TIME_LEFT_STRINGS[record.duration or 0] or '?')
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.compare(record_a.duration, record_b.duration, desc)
         end,
     },
@@ -307,24 +330,24 @@ M.auctions_columns = {
         fill = function(cell, record)
             local price
             if record.high_bidder then
-                price = price_per_unit and ceil(record.high_bid / record.aux_quantity) or record.high_bid
+                price = cell.rt.price_per_unit and ceil(record.high_bid / record.aux_quantity) or record.high_bid
             else
-                price = price_per_unit and ceil(record.start_price / record.aux_quantity) or record.start_price
+                price = cell.rt.price_per_unit and ceil(record.start_price / record.aux_quantity) or record.start_price
             end
             cell.text:SetText(money.to_string(price, true))
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             local price_a
             if record_a.high_bidder then
-                price_a = price_per_unit and record_a.high_bid / record_a.aux_quantity or record_a.high_bid
+                price_a = rt.price_per_unit and record_a.high_bid / record_a.aux_quantity or record_a.high_bid
             else
-                price_a = price_per_unit and record_a.start_price / record_b.aux_quantity or record_a.start_price
+                price_a = rt.price_per_unit and record_a.start_price / record_a.aux_quantity or record_a.start_price
             end
             local price_b
             if record_b.high_bidder then
-                price_b = price_per_unit and record_b.high_bid / record_b.aux_quantity or record_b.high_bid
+                price_b = rt.price_per_unit and record_b.high_bid / record_b.aux_quantity or record_b.high_bid
             else
-                price_b = price_per_unit and record_b.start_price / record_b.aux_quantity or record_b.start_price
+                price_b = rt.price_per_unit and record_b.start_price / record_b.aux_quantity or record_b.start_price
             end
             return sort_util.compare(price_a, price_b, desc)
         end,
@@ -335,12 +358,12 @@ M.auctions_columns = {
         align = 'RIGHT',
         isPrice = true,
         fill = function(cell, record)
-            local price = price_per_unit and ceil(record.unit_buyout_price) or record.buyout_price
+            local price = cell.rt.price_per_unit and ceil(record.unit_buyout_price) or record.buyout_price
             cell.text:SetText(price > 0 and money.to_string(price, true) or '---')
         end,
-        cmp = function(record_a, record_b, desc)
-            local price_a = price_per_unit and record_a.unit_buyout_price or record_a.buyout_price
-            local price_b = price_per_unit and record_b.unit_buyout_price or record_b.buyout_price
+        cmp = function(rt, record_a, record_b, desc)
+            local price_a = rt.price_per_unit and record_a.unit_buyout_price or record_a.buyout_price
+            local price_b = rt.price_per_unit and record_b.unit_buyout_price or record_b.buyout_price
             price_a = price_a > 0 and price_a or (desc and -aux.huge or aux.huge)
             price_b = price_b > 0 and price_b or (desc and -aux.huge or aux.huge)
 
@@ -354,7 +377,7 @@ M.auctions_columns = {
         fill = function(cell, record)
             cell.text:SetText(record.high_bidder or aux.color.red 'No Bids')
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             if not record_a.high_bidder and not record_b.high_bidder then
                 return sort_util.EQ
             elseif not record_a.high_bidder then
@@ -374,7 +397,7 @@ M.bids_columns = {
         width = .35,
         init = item_column_init,
         fill = item_column_fill,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.compare(record_a.name, record_b.name, desc)
         end,
     },
@@ -386,7 +409,7 @@ M.bids_columns = {
             local numAuctionsText = expandable and aux.color.link(count) or count
             cell.text:SetText(numAuctionsText)
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.EQ
             --            if sortKey == 'numAuctions' then
             --                if a.children then
@@ -406,7 +429,7 @@ M.bids_columns = {
         fill = function(cell, record)
             cell.text:SetText(record.aux_quantity)
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.compare(record_a.aux_quantity, record_b.aux_quantity, desc)
         end,
     },
@@ -417,7 +440,7 @@ M.bids_columns = {
         fill = function(cell, record)
             cell.text:SetText(TIME_LEFT_STRINGS[record.duration or 0] or '?')
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.compare(record_a.duration, record_b.duration, desc)
         end,
     },
@@ -428,7 +451,7 @@ M.bids_columns = {
         fill = function(cell, record)
             cell.text:SetText(info.is_player(record.owner) and (aux.color.yellow(record.owner)) or (record.owner or '?'))
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             if not record_a.owner and not record_b.owner then
                 return sort_util.EQ
             elseif not record_a.owner then
@@ -448,24 +471,24 @@ M.bids_columns = {
         fill = function(cell, record)
             local price
             if record.high_bidder then
-                price = price_per_unit and ceil(record.high_bid / record.aux_quantity) or record.high_bid
+                price = cell.rt.price_per_unit and ceil(record.high_bid / record.aux_quantity) or record.high_bid
             else
-                price = price_per_unit and ceil(record.unit_bid_price) or record.bid_price
+                price = cell.rt.price_per_unit and ceil(record.unit_bid_price) or record.bid_price
             end
             cell.text:SetText(money.to_string(price))
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             local price_a
             if record_a.high_bidder then
-                price_a = price_per_unit and record_a.high_bid / record_a.aux_quantity or record_a.high_bid
+                price_a = rt.price_per_unit and record_a.high_bid / record_a.aux_quantity or record_a.high_bid
             else
-                price_a = price_per_unit and record_a.unit_bid_price or record_a.bid_price
+                price_a = rt.price_per_unit and record_a.unit_bid_price or record_a.bid_price
             end
             local price_b
             if record_b.high_bidder then
-                price_b = price_per_unit and record_b.high_bid / record_b.aux_quantity or record_b.high_bid
+                price_b = rt.price_per_unit and record_b.high_bid / record_b.aux_quantity or record_b.high_bid
             else
-                price_b = price_per_unit and record_b.unit_bid_price or record_b.bid_price
+                price_b = rt.price_per_unit and record_b.unit_bid_price or record_b.bid_price
             end
             return sort_util.compare(price_a, price_b, desc)
         end,
@@ -476,12 +499,12 @@ M.bids_columns = {
         align = 'RIGHT',
         isPrice = true,
         fill = function(cell, record)
-            local price = price_per_unit and ceil(record.unit_buyout_price) or record.buyout_price
+            local price = cell.rt.price_per_unit and ceil(record.unit_buyout_price) or record.buyout_price
             cell.text:SetText(price > 0 and money.to_string(price, true) or '---')
         end,
-        cmp = function(record_a, record_b, desc)
-            local price_a = price_per_unit and record_a.unit_buyout_price or record_a.buyout_price
-            local price_b = price_per_unit and record_b.unit_buyout_price or record_b.buyout_price
+        cmp = function(rt, record_a, record_b, desc)
+            local price_a = rt.price_per_unit and record_a.unit_buyout_price or record_a.buyout_price
+            local price_b = rt.price_per_unit and record_b.unit_buyout_price or record_b.buyout_price
             price_a = price_a > 0 and price_a or (desc and -aux.huge or aux.huge)
             price_b = price_b > 0 and price_b or (desc and -aux.huge or aux.huge)
 
@@ -501,7 +524,7 @@ M.bids_columns = {
             end
             cell.text:SetText(status)
         end,
-        cmp = function(record_a, record_b, desc)
+        cmp = function(rt, record_a, record_b, desc)
             return sort_util.compare(record_a.high_bidder and 1 or 0, record_b.high_bidder and 1 or 0, desc)
         end,
     },
@@ -545,10 +568,10 @@ local methods = {
         local rt = this.rt
 
         if button == 'RightButton' and rt.headCells[this.columnIndex].info.isPrice then
-            price_per_unit = not price_per_unit
+            rt.price_per_unit = not rt.price_per_unit
             for _, cell in rt.headCells do
                 if cell.info.isPrice then
-                    cell:SetText(cell.info.title[price_per_unit and 1 or 2])
+                    cell:SetText(cell.info.title[rt.price_per_unit and 1 or 2])
                 end
             end
             rt:SetSort()
@@ -723,7 +746,7 @@ local methods = {
                 end
 
                 for _, sort in self.sorts do
-                    local ordering = self.columns[sort.index].cmp and self.columns[sort.index].cmp(record_a, record_b, sort.descending) or sort_util.EQ
+                    local ordering = self.columns[sort.index].cmp and self.columns[sort.index].cmp(self, record_a, record_b, sort.descending) or sort_util.EQ
 
                     if ordering == sort_util.LT then
                         return true
@@ -767,6 +790,13 @@ local methods = {
             row.highlight:Show()
         else
             row.highlight:Hide()
+        end
+
+        local vendor_price = info.vendor_sell_price(record.item_id)
+        if vendor_price and vendor_price > 0 and record.unit_buyout_price > 0 and record.unit_buyout_price <= vendor_price * 0.9 then
+            row.bargain_highlight:Show()
+        else
+            row.bargain_highlight:Hide()
         end
 
         row.record = record
@@ -890,6 +920,7 @@ function M.new(parent, rows, columns)
     local rt = CreateFrame('Frame', nil, parent)
     rt.columns = columns
     rt.ROW_HEIGHT = (parent:GetHeight() - HEAD_HEIGHT - HEAD_SPACE) / rows
+    rt.price_per_unit = columns == M.search_columns
     rt.expanded = {}
     rt.handlers = {}
     rt.sorts = {}
@@ -903,7 +934,7 @@ function M.new(parent, rows, columns)
     rt:SetScript('OnShow', function()
         for _, cell in this.headCells do
             if cell.info.isPrice then
-                cell:SetText(cell.info.title[price_per_unit and 1 or 2])
+                cell:SetText(cell.info.title[this.price_per_unit and 1 or 2])
             end
         end
     end)
@@ -998,6 +1029,13 @@ function M.new(parent, rows, columns)
         highlight:SetTexture(1, .9, 0, .2)
         highlight:Hide()
         row.highlight = highlight
+
+        local bargain_highlight = row:CreateTexture()
+        bargain_highlight:SetPoint("TOPLEFT", 3, 0)
+        bargain_highlight:SetPoint("BOTTOMRIGHT", -3, 0)
+        bargain_highlight:SetTexture(0, 1, 0, .2)
+        bargain_highlight:Hide()
+        row.bargain_highlight = bargain_highlight
 
         row.cells = {}
         for j, column in ipairs(rt.columns) do

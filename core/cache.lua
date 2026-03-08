@@ -92,6 +92,15 @@ function M.merchant_info(item_id)
 	return aux.account_data.merchant_sell[item_id], buy_info and buy_info.unit_price, buy_info and buy_info.limited
 end
 
+function M.vendor_sell_price(item_id)
+	local price = aux.account_data.merchant_sell[item_id]
+	if price == nil and ShaguTweaks and ShaguTweaks.SellValueDB[item_id] ~= nil then
+		local charges = M.max_item_charges(item_id) or 1
+		price = ShaguTweaks.SellValueDB[item_id] / charges
+	end
+	return price
+end
+
 function M.item_info(item_id)
 	local data_string = aux.account_data.items[item_id]
 	if data_string then
