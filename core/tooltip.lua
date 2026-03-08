@@ -80,15 +80,8 @@ function M.extend_tooltip(tooltip, link, quantity)
         end
     end
     if settings.merchant_sell then
-        local price = info.merchant_info(item_id)
-        if price == nil and ShaguTweaks and ShaguTweaks.SellValueDB[item_id] ~= nil then
-            local charges = 1
-            if info.max_item_charges(item_id) ~= nil then 
-                charges = info.max_item_charges(item_id) 
-            end
-            price = ShaguTweaks.SellValueDB[item_id] / charges
-        end
-        if price ~= 0 then
+        local price = info.vendor_sell_price(item_id)
+        if price and price ~= 0 then
             tooltip:AddLine(aux.color.tooltip.merchant('Vendor:') .. ' ' .. (price and money.to_string(price * quantity) or UNKNOWN), {r=1, g=1, b=1})
 		end
     end

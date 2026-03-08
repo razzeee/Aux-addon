@@ -234,6 +234,16 @@ end
 do
     local btn = gui.button(frame.results)
     btn:SetPoint('TOPLEFT', buyout_button, 'TOPRIGHT', 5, 0)
+    btn:SetText('Bargains')
+    btn:SetScript('OnClick', function()
+        search_box:SetText('/vendor-profit/1c')
+        execute()
+    end)
+    bargain_button = btn
+end
+do
+    local btn = gui.button(frame.results)
+    btn:SetPoint('TOPLEFT', bargain_button, 'TOPRIGHT', 5, 0)
     btn:SetText('Clear')
     btn:SetScript('OnClick', function()
         while tremove(current_search().records) do end
