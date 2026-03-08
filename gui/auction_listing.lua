@@ -64,7 +64,7 @@ end
 M.search_columns = {
     {
         title = 'Item:',
-        width = .31,
+        width = .27,
         init = item_column_init,
         fill = item_column_fill,
         cmp = function(rt, record_a, record_b, desc)
@@ -216,25 +216,29 @@ M.search_columns = {
         end,
     },
     {
-        title = 'Vendor\n(%):',
-        width = .08,
-        align = 'CENTER',
+        title = 'Vendor/Profit\n(per item):',
+        width = .12,
+        align = 'RIGHT',
         fill = function(cell, record)
             local vendor_price = info.vendor_sell_price(record.item_id)
-            local pct = (vendor_price and vendor_price > 0 and record.unit_buyout_price > 0) and aux.round(record.unit_buyout_price / vendor_price * 100) or nil
-            cell.text:SetText(pct and gui.percentage_historical(pct) or '?')
+            local profit = (vendor_price and record.unit_buyout_price > 0) and (vendor_price - record.unit_buyout_price) or nil
+            local text = (vendor_price and money.to_string(vendor_price, true) or '?')
+            if profit and profit > 0 then
+                text = text .. '\n' .. aux.color.green('+' .. money.to_string(profit, true))
+            end
+            cell.text:SetText(text)
         end,
         cmp = function(rt, record_a, record_b, desc)
             local vendor_price_a = info.vendor_sell_price(record_a.item_id)
-            local pct_a = (vendor_price_a and vendor_price_a > 0 and record_a.unit_buyout_price > 0) and record_a.unit_buyout_price / vendor_price_a or (desc and -aux.huge or aux.huge)
+            local profit_a = (vendor_price_a and record_a.unit_buyout_price > 0) and (vendor_price_a - record_a.unit_buyout_price) or (desc and -aux.huge or aux.huge)
             local vendor_price_b = info.vendor_sell_price(record_b.item_id)
-            local pct_b = (vendor_price_b and vendor_price_b > 0 and record_b.unit_buyout_price > 0) and record_b.unit_buyout_price / vendor_price_b or (desc and -aux.huge or aux.huge)
-            return sort_util.compare(pct_a, pct_b, desc)
+            local profit_b = (vendor_price_b and record_b.unit_buyout_price > 0) and (vendor_price_b - record_b.unit_buyout_price) or (desc and -aux.huge or aux.huge)
+            return sort_util.compare(profit_a, profit_b, desc)
         end,
     },
     {
         title = 'Historical\nValue (%):',
-        width = .08,
+        width = .06,
         align = 'CENTER',
         fill = function(cell, record)
             local pct, bidPct = record_percentage(record)
