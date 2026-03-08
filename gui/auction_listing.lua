@@ -64,7 +64,7 @@ end
 M.search_columns = {
     {
         title = 'Item:',
-        width = .27,
+        width = .29,
         init = item_column_init,
         fill = item_column_fill,
         cmp = function(rt, record_a, record_b, desc)
@@ -73,7 +73,7 @@ M.search_columns = {
     },
     {
         title = 'Lvl:',
-        width = .035,
+        width = .04,
         align = 'CENTER',
         fill = function(cell, record)
             local display_level = max(record.level, 1)
@@ -110,7 +110,7 @@ M.search_columns = {
     },
     {
         title = 'Stack\nSize:',
-        width = .055,
+        width = .06,
         align = 'CENTER',
         fill = function(cell, record)
             cell.text:SetText(record.aux_quantity)
@@ -216,24 +216,28 @@ M.search_columns = {
         end,
     },
     {
-        title = 'Vendor/Profit\n(per item):',
-        width = .12,
+        title = 'Vendor/\nProfit:',
+        width = .09,
         align = 'RIGHT',
         fill = function(cell, record)
             local vendor_price = info.vendor_sell_price(record.item_id)
             local profit = (vendor_price and record.unit_buyout_price > 0) and (vendor_price - record.unit_buyout_price) or nil
-            local text = (vendor_price and money.to_string(vendor_price, true) or '?')
             if profit and profit > 0 then
-                text = text .. '\n' .. aux.color.green('+' .. money.to_string(profit, true))
+                cell.text:SetText(aux.color.green('+' .. money.to_string(profit, true)))
+            else
+                cell.text:SetText(vendor_price and money.to_string(vendor_price, true) or '?')
             end
-            cell.text:SetText(text)
         end,
         cmp = function(rt, record_a, record_b, desc)
             local vendor_price_a = info.vendor_sell_price(record_a.item_id)
-            local profit_a = (vendor_price_a and record_a.unit_buyout_price > 0) and (vendor_price_a - record_a.unit_buyout_price) or (desc and -aux.huge or aux.huge)
+            local profit_a = (vendor_price_a and record_a.unit_buyout_price > 0) and (vendor_price_a - record_a.unit_buyout_price) or nil
             local vendor_price_b = info.vendor_sell_price(record_b.item_id)
-            local profit_b = (vendor_price_b and record_b.unit_buyout_price > 0) and (vendor_price_b - record_b.unit_buyout_price) or (desc and -aux.huge or aux.huge)
-            return sort_util.compare(profit_a, profit_b, desc)
+            local profit_b = (vendor_price_b and record_b.unit_buyout_price > 0) and (vendor_price_b - record_b.unit_buyout_price) or nil
+
+            local val_a = (profit_a and profit_a > 0) and (1e12 + profit_a) or (vendor_price_a or -1)
+            local val_b = (profit_b and profit_b > 0) and (1e12 + profit_b) or (vendor_price_b or -1)
+
+            return sort_util.compare(val_a, val_b, desc)
         end,
     },
     {
